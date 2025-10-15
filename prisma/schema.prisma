@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Departamento {
+  id      Int      @id @default(autoincrement())
+  numero  String   @unique
+  usuarios Usuario[]
+}
+
+model Usuario {
+  id             String       @id @default(uuid())
+  nombre         String
+  email          String       @unique
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id])
+  departamentoId Int?
+  encomiendas    Encomienda[]
+}
+
+model Encomienda {
+  id             String        @id @default(uuid())
+  codigo         String        @unique
+  residente      Usuario?      @relation(fields: [residenteId], references: [id])
+  residenteId    String?
+  fechaRecepcion DateTime      @default(now())
+  estado         String        @default("recibida")
+  notificaciones Notificacion[]
+}
+
+model Notificacion {
+  id           String     @id @default(uuid())
+  encomienda   Encomienda @relation(fields: [encomiendaId], references: [id])
+  encomiendaId String
+  medio        String
+  enviadoEn    DateTime   @default(now())
+}
