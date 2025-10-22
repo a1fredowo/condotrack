@@ -15,20 +15,6 @@ const inputClass =
 
 const labelClass = "text-sm font-medium text-card-foreground";
 
-// Empresas transportistas más conocidas en Chile
-const TRANSPORTISTAS_CHILE = [
-  "Chilexpress",
-  "Starken",
-  "Blue Express",
-  "Correos de Chile",
-  "DHL",
-  "FedEx",
-  "UPS",
-  "99 Minutos",
-  "Shipit",
-  "Otra",
-];
-
 interface RegisterShipmentFormProps {
   onSubmit: (data: {
     residente: string;
@@ -45,7 +31,7 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
     residente: "",
     torre: "A",
     numeroDepartamento: "",
-    transportista: "",
+    transportista: "Chilexpress",
     transportistaOtra: "",
     codigoSeguimiento: "",
     prioridad: "normal" as "normal" | "urgente",
@@ -68,7 +54,7 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
       const departamento = `Torre ${formData.torre} · ${formData.numeroDepartamento}`;
       
       // Obtener transportista final
-      const transportista = formData.transportista === "Otra" 
+      const transportista = formData.transportista === "Otro" 
         ? formData.transportistaOtra 
         : formData.transportista;
 
@@ -89,7 +75,7 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
         residente: "",
         torre: "A",
         numeroDepartamento: "",
-        transportista: "",
+        transportista: "Chilexpress",
         transportistaOtra: "",
         codigoSeguimiento: "",
         prioridad: "normal",
@@ -191,16 +177,18 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
                 onChange={handleChange}
                 className={inputClass}
               >
-                <option value="">Seleccione una empresa</option>
-                {TRANSPORTISTAS_CHILE.map((empresa) => (
-                  <option key={empresa} value={empresa}>
-                    {empresa}
-                  </option>
-                ))}
+                <option value="Chilexpress">Chilexpress</option>
+                <option value="Starken">Starken</option>
+                <option value="Blue Express">Blue Express</option>
+                <option value="Correos de Chile">Correos de Chile</option>
+                <option value="Rappi">Rappi</option>
+                <option value="PedidosYa">PedidosYa</option>
+                <option value="Uber Eats">Uber Eats</option>
+                <option value="Otro">Otro</option>
               </select>
             </div>
 
-            {formData.transportista === "Otra" && (
+            {formData.transportista === "Otro" && (
               <div className="space-y-2">
                 <label htmlFor="transportistaOtra" className={labelClass}>
                   Especificar Transportista <span className="text-destructive">*</span>

@@ -57,7 +57,7 @@ export default function EncomiendasPage() {
   // Estados para los filtros
   const [filters, setFilters] = useState({
     departamento: "",
-    transportista: "",
+    transportista: "todos",
     estado: "todos",
     fecha: "",
   });
@@ -97,7 +97,7 @@ export default function EncomiendasPage() {
       }
       
       // Filtro por transportista
-      if (filters.transportista && !shipment.transportista.toLowerCase().includes(filters.transportista.toLowerCase())) {
+      if (filters.transportista !== "todos" && shipment.transportista !== filters.transportista) {
         return false;
       }
       
@@ -221,12 +221,21 @@ export default function EncomiendasPage() {
           </label>
           <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
             Transportista
-            <input 
-              className={inputClass} 
-              placeholder="Starken, Chilexpress..."
+            <select 
+              className={inputClass}
               value={filters.transportista}
               onChange={(e) => setFilters({ ...filters, transportista: e.target.value })}
-            />
+            >
+              <option value="todos">Todos</option>
+              <option value="Chilexpress">Chilexpress</option>
+              <option value="Starken">Starken</option>
+              <option value="Blue Express">Blue Express</option>
+              <option value="Correos de Chile">Correos de Chile</option>
+              <option value="Rappi">Rappi</option>
+              <option value="PedidosYa">PedidosYa</option>
+              <option value="Uber Eats">Uber Eats</option>
+              <option value="Otro">Otro</option>
+            </select>
           </label>
           <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
             Estado
@@ -236,9 +245,9 @@ export default function EncomiendasPage() {
               onChange={(e) => setFilters({ ...filters, estado: e.target.value })}
             >
               <option value="todos">Todos</option>
-              <option value="pendientes">Pendientes</option>
-              <option value="entregados">Entregados</option>
-              <option value="incidencias">Incidencias</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="entregado">Entregado</option>
+              <option value="incidencia">Incidencia</option>
             </select>
           </label>
           <label className="flex flex-col gap-2 text-xs font-medium text-muted-foreground">
