@@ -3,14 +3,23 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model Departamento {
-  id      Int      @id @default(autoincrement())
-  numero  String   @unique
-  usuarios Usuario[]
+  id        Int      @id @default(autoincrement())
+  numero    String
+  torre     String   @default("A")
+  usuarios  Usuario[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([numero, torre])
+  @@map("departamentos")
+  @@index([numero])
+  @@index([torre])
 }
 
 model Usuario {
@@ -20,6 +29,10 @@ model Usuario {
   departamento   Departamento? @relation(fields: [departamentoId], references: [id])
   departamentoId Int?
   encomiendas    Encomienda[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  @@map("usuarios")
 }
 
 model Encomienda {
@@ -27,15 +40,30 @@ model Encomienda {
   codigo         String        @unique
   residente      Usuario?      @relation(fields: [residenteId], references: [id])
   residenteId    String?
+  residenteNombre String       // 👈 NUEVO: Nombre del residente
+  transportista  String
   fechaRecepcion DateTime      @default(now())
-  estado         String        @default("recibida")
+  estado         String        @default("pendiente")
+  prioridad      String        @default("normal")
   notificaciones Notificacion[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  
+  @@map("encomiendas")
+  @@index([estado])
+  @@index([residenteId])
+  @@index([fechaRecepcion])
 }
 
 model Notificacion {
   id           String     @id @default(uuid())
-  encomienda   Encomienda @relation(fields: [encomiendaId], references: [id])
+  encomienda   Encomienda @relation(fields: [encomiendaId], references: [id], onDelete: Cascade)
   encomiendaId String
-  medio        String
+  medio        String     // correo, app, sms
+  mensaje      String?    // Contenido opcional del mensaje
+  entregada    Boolean    @default(false)
   enviadoEn    DateTime   @default(now())
+  
+  @@map("notificaciones")
+  @@index([encomiendaId])
 }

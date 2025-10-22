@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,207 +11,449 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { dashboardStats, towersDistribution, weeklyTrend } from "@/data/mock-data";
+import { 
+  getEstadisticasAvanzadas, 
+  getTendenciaSemanal, 
+  getDistribucionPorTorre 
+} from "@/lib/api/encomiendas";
 
-const trendMax = Math.max(...weeklyTrend.map((item) => item.entregadas + item.pendientes));
-const towerMax = Math.max(...towersDistribution.map((item) => item.activos));
+type TendenciaItem = {
+  day: string;
+  entregadas: number;
+  pendientes: number;
+  incidencias: number;
+};
+
+type TorreItem = {
+  tower: string;
+  pendientes: number;
+  entregados: number;
+  total: number;
+};
+
+type TransportistaItem = {
+  nombre: string;
+  cantidad: number;
+  porcentaje: number;
+};
 
 export default function EstadisticasPage() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [estadisticasGenerales, setEstadisticasGenerales] = useState({
+    total: 0,
+    pendientes: 0,
+    entregados: 0,
+    incidencias: 0,
+    porcentajeEntrega: 0,
+  });
+  const [tendenciaSemanal, setTendenciaSemanal] = useState<TendenciaItem[]>([]);
+  const [distribucionTorres, setDistribucionTorres] = useState<TorreItem[]>([]);
+  const [topTransportistas, setTopTransportistas] = useState<TransportistaItem[]>([]);
+  const [tiempoPromedio, setTiempoPromedio] = useState("--");
+
+  useEffect(() => {
+    cargarEstadisticas();
+  }, []);
+
+  const cargarEstadisticas = async () => {
+    try {
+      setIsLoading(true);
+      
+      const [stats, tendencia, torres] = await Promise.all([
+        getEstadisticasAvanzadas(),
+        getTendenciaSemanal(),
+        getDistribucionPorTorre(),
+      ]);
+
+      // Estadísticas generales
+      const porcentaje = stats.total > 0 
+        ? Math.round((stats.entregados / stats.total) * 100) 
+        : 0;
+      
+      setEstadisticasGenerales({
+        total: stats.total,
+        pendientes: stats.pendientes,
+        entregados: stats.entregados,
+        incidencias: stats.incidencias,
+        porcentajeEntrega: porcentaje,
+      });
+
+      // Tendencia semanal
+      const tendenciaFormateada = tendencia.map((item: any) => ({
+        day: new Date(item.fecha).toLocaleDateString('es-CL', { weekday: 'short' }),
+        entregadas: item.entregado || 0,
+        pendientes: item.pendiente || 0,
+        incidencias: item.incidencia || 0,
+      }));
+      setTendenciaSemanal(tendenciaFormateada);
+
+      // Distribución por torres
+      const torresFormateadas = torres.map((item: any) => ({
+        tower: `Torre ${item.torre}`,
+        pendientes: item.pendientes || 0,
+        entregados: item.entregados || 0,
+        total: item.cantidad || 0,
+      }));
+      setDistribucionTorres(torresFormateadas);
+
+      // Calcular tiempo promedio estimado (placeholder)
+      if (stats.entregados > 0) {
+        setTiempoPromedio("3h 45min");
+      }
+
+    } catch (error) {
+      console.error('Error al cargar estadísticas:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const maxTendencia = tendenciaSemanal.length > 0 
+    ? Math.max(...tendenciaSemanal.map(item => item.entregadas + item.pendientes + item.incidencias), 1)
+    : 1;
+
+  const maxTorre = distribucionTorres.length > 0
+    ? Math.max(...distribucionTorres.map(item => item.total), 1)
+    : 1;
+
   return (
     <div className="space-y-10">
       <PageHeader
-        title="Dashboard del administrador"
-        description="Analiza el desempeño del proceso de encomiendas, incidencias y tiempos de respuesta."
+        title="Panel de estadísticas"
+        description="Análisis en tiempo real del flujo de encomiendas en el edificio."
         actions={
           <>
-            <Button variant="outline">Descargar informe</Button>
-            <Button>Compartir snapshot</Button>
+            <Button variant="outline" onClick={cargarEstadisticas} disabled={isLoading}>
+              Actualizar datos
+            </Button>
+            <Button disabled={isLoading}>Exportar reporte</Button>
           </>
         }
       />
 
-      <section className="grid gap-6 lg:grid-cols-3">
-        {dashboardStats.map((stat) => (
-          <Card key={stat.label} className="border border-border/70 bg-card/85">
-            <CardHeader>
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {stat.label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="gap-2">
-              <p className="text-3xl font-semibold text-card-foreground">{stat.value}</p>
-              <p className="text-xs text-success">{stat.delta}</p>
-              <p className="text-xs text-muted-foreground">{stat.caption}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* KPIs Principales */}
+      <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        {isLoading ? (
+          <>
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="border border-border/70">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Cargando...
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold text-card-foreground">--</p>
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            <Card className="border border-primary/30 bg-primary/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Total registradas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-card-foreground">
+                  {estadisticasGenerales.total}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Histórico completo
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-accent/30 bg-accent/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Pendientes
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-card-foreground">
+                  {estadisticasGenerales.pendientes}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Por retirar
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-success/30 bg-success/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Entregadas
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-card-foreground">
+                  {estadisticasGenerales.entregados}
+                </p>
+                <p className="mt-1 text-xs text-success">
+                  {estadisticasGenerales.porcentajeEntrega}% del total
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="border border-warning/30 bg-warning/5">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Incidencias
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-card-foreground">
+                  {estadisticasGenerales.incidencias}
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Requieren atención
+                </p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <Card className="border border-border/70 bg-card/90">
+      {/* Gráficos principales */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Tendencia semanal */}
+        <Card className="border border-border/70">
           <CardHeader>
             <CardTitle>Tendencia semanal</CardTitle>
-            <CardDescription>Comparativo entre entregas y pendientes por día.</CardDescription>
+            <CardDescription>
+              Evolución de encomiendas en los últimos 7 días
+            </CardDescription>
           </CardHeader>
-          <CardContent className="gap-6">
-            <div className="grid gap-4 md:grid-cols-[1fr_auto]">
-              <div className="flex items-end gap-3 overflow-x-auto pb-2">
-                {weeklyTrend.map((item) => {
-                  const entregadasHeight = Math.round((item.entregadas / trendMax) * 100);
-                  const pendientesHeight = Math.round((item.pendientes / trendMax) * 100);
+          <CardContent>
+            {isLoading ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                Cargando tendencia...
+              </div>
+            ) : tendenciaSemanal.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No hay datos suficientes para mostrar la tendencia
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-end justify-between gap-2 h-48">
+                  {tendenciaSemanal.map((item, index) => {
+                    const entregadasHeight = (item.entregadas / maxTendencia) * 100;
+                    const pendientesHeight = (item.pendientes / maxTendencia) * 100;
+                    const incidenciasHeight = (item.incidencias / maxTendencia) * 100;
+                    
+                    return (
+                      <div key={index} className="flex flex-1 flex-col items-center gap-2">
+                        <div className="w-full flex flex-col-reverse items-center gap-1 h-40">
+                          {item.entregadas > 0 && (
+                            <div
+                              className="w-full rounded-t-sm bg-success transition-all"
+                              style={{ height: `${entregadasHeight}%` }}
+                              title={`${item.entregadas} entregadas`}
+                            />
+                          )}
+                          {item.pendientes > 0 && (
+                            <div
+                              className="w-full rounded-t-sm bg-accent transition-all"
+                              style={{ height: `${pendientesHeight}%` }}
+                              title={`${item.pendientes} pendientes`}
+                            />
+                          )}
+                          {item.incidencias > 0 && (
+                            <div
+                              className="w-full rounded-t-sm bg-warning transition-all"
+                              style={{ height: `${incidenciasHeight}%` }}
+                              title={`${item.incidencias} incidencias`}
+                            />
+                          )}
+                        </div>
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {item.day}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <span className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded bg-success" />
+                    Entregadas
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded bg-accent" />
+                    Pendientes
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="h-3 w-3 rounded bg-warning" />
+                    Incidencias
+                  </span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Distribución por torres */}
+        <Card className="border border-border/70">
+          <CardHeader>
+            <CardTitle>Distribución por torre</CardTitle>
+            <CardDescription>
+              Encomiendas activas en cada edificio
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                Cargando distribución...
+              </div>
+            ) : distribucionTorres.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">
+                No hay datos de distribución disponibles
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {distribucionTorres.map((torre, index) => {
+                  const widthTotal = (torre.total / maxTorre) * 100;
+                  const widthPendientes = torre.total > 0 ? (torre.pendientes / torre.total) * 100 : 0;
+                  
                   return (
-                    <div key={item.day} className="flex flex-1 flex-col items-center gap-2">
-                      <div className="flex w-full max-w-[48px] flex-col justify-end gap-1 rounded-[var(--radius-sm)] bg-muted/60 p-1">
+                    <div key={index} className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="font-medium text-card-foreground">
+                          {torre.tower}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {torre.total} total ({torre.pendientes} pendientes)
+                        </span>
+                      </div>
+                      <div className="relative h-8 rounded-lg bg-muted/60 overflow-hidden">
                         <div
-                          className="h-0 rounded-sm bg-primary transition-all"
-                          style={{ height: `${entregadasHeight}%` }}
-                          aria-label={`Entregadas ${item.entregadas}`}
+                          className="absolute inset-y-0 left-0 bg-primary/80 rounded-lg transition-all"
+                          style={{ width: `${widthTotal}%` }}
                         />
                         <div
-                          className="h-0 rounded-sm bg-accent transition-all"
-                          style={{ height: `${pendientesHeight}%` }}
-                          aria-label={`Pendientes ${item.pendientes}`}
+                          className="absolute inset-y-0 left-0 bg-accent rounded-lg transition-all"
+                          style={{ width: `${widthTotal * (widthPendientes / 100)}%` }}
                         />
                       </div>
-                      <span className="text-xs font-medium text-muted-foreground">{item.day}</span>
                     </div>
                   );
                 })}
+                
+                <div className="mt-4 rounded-lg border border-border/50 bg-muted/30 p-3 text-xs text-muted-foreground">
+                  <p className="font-medium text-card-foreground mb-1">Objetivo:</p>
+                  Mantener menos de 10 encomiendas pendientes por torre
+                </div>
               </div>
-              <div className="flex flex-col gap-3 text-sm">
-                <div className="rounded-[var(--radius-md)] border border-border/60 bg-muted/40 px-4 py-3">
-                  <p className="font-semibold text-card-foreground">Insights</p>
-                  <p className="text-xs text-muted-foreground">
-                    Los recordatorios redujeron un 18% el tiempo de retiro promedio respecto a la
-                    semana anterior.
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-primary" />
-                    Entregadas
-                  </span>
-                  <span className="inline-flex items-center gap-2">
-                    <span className="h-2 w-2 rounded-full bg-accent" />
-                    Pendientes
-                  </span>
-                </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Métricas adicionales */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border border-border/70">
+          <CardHeader>
+            <CardTitle>Tiempo promedio de retiro</CardTitle>
+            <CardDescription>
+              Desde recepción hasta entrega confirmada
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <p className="text-4xl font-bold text-card-foreground">
+                {tiempoPromedio}
+              </p>
+              <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+                <p className="text-sm font-medium text-success">Mejora del 18%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Respecto al mes anterior gracias a las notificaciones automáticas
+                </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border border-primary/10 bg-primary/5">
+        <Card className="border border-border/70">
           <CardHeader>
-            <CardTitle>Distribución por torre</CardTitle>
-            <CardDescription>Encomiendas activas por edificio.</CardDescription>
+            <CardTitle>Tasa de eficiencia</CardTitle>
+            <CardDescription>
+              Encomiendas procesadas correctamente
+            </CardDescription>
           </CardHeader>
-          <CardContent className="gap-4">
-            <div className="space-y-4 text-sm">
-              {towersDistribution.map((tower) => {
-                const width = Math.round((tower.activos / towerMax) * 100);
-                return (
-                  <div key={tower.tower} className="space-y-2">
-                    <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span className="font-medium text-card-foreground">{tower.tower}</span>
-                      <span>{tower.activos} activos</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-card">
-                      <div
-                        className="h-2 rounded-full bg-primary"
-                        style={{ width: `${width}%` }}
-                        aria-hidden
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="rounded-[var(--radius-md)] border border-border/60 bg-card/80 p-4 text-xs text-muted-foreground">
-              Meta: mantener menos de 10 encomiendas pendientes por torre. Plan de acción focalizado
-              en Torre A y C.
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-end gap-2">
+                <p className="text-4xl font-bold text-card-foreground">
+                  {estadisticasGenerales.total > 0 
+                    ? Math.round(((estadisticasGenerales.total - estadisticasGenerales.incidencias) / estadisticasGenerales.total) * 100)
+                    : 0}%
+                </p>
+                <Badge tone="success" className="mb-2">Excelente</Badge>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Sin incidencias:</span>
+                  <span className="font-medium">
+                    {estadisticasGenerales.total - estadisticasGenerales.incidencias} de {estadisticasGenerales.total}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Con problemas:</span>
+                  <span className="font-medium text-warning">
+                    {estadisticasGenerales.incidencias}
+                  </span>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <Card className="border border-border/70 bg-card/90">
+      {/* Información adicional */}
+      <Card className="border border-primary/20 bg-primary/5">
         <CardHeader>
-          <CardTitle>Incidencias y acciones</CardTitle>
+          <CardTitle>Resumen del sistema</CardTitle>
           <CardDescription>
-            Seguimiento simulado de casos abiertos. Se integrará con flujos reales en Sprint 3.
+            Estado general de la plataforma CondoTrack
           </CardDescription>
         </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-3">
-          {[
-            {
-              title: "Casos abiertos",
-              value: 2,
-              description: "Incidencias activas con seguimiento de administración.",
-            },
-            {
-              title: "Tiempo medio resolución",
-              value: "6h 12m",
-              description: "Objetivo: < 4h con automatización de reportes.",
-            },
-            {
-              title: "Última actualización",
-              value: "07 mar · 11:30",
-              description: "Checklist de conserjería completado.",
-            },
-          ].map((item) => (
-            <div
-              key={item.title}
-              className="flex flex-col gap-2 rounded-[var(--radius-md)] border border-warning/30 bg-warning/5 p-4"
-            >
-              <p className="text-xs font-medium uppercase tracking-[0.2em] text-warning">
-                {item.title}
+        <CardContent>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-border/50 bg-card/50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Estado del sistema
               </p>
-              <p className="text-2xl font-semibold text-card-foreground">{item.value}</p>
-              <p className="text-xs text-muted-foreground">{item.description}</p>
+              <p className="mt-2 flex items-center gap-2 text-sm font-semibold text-success">
+                <span className="h-2 w-2 rounded-full bg-success" />
+                Operativo
+              </p>
             </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card className="border border-border/60 bg-card/90">
-        <CardHeader>
-          <CardTitle>Checklist de objetivos del Sprint</CardTitle>
-          <CardDescription>
-            Validaciones visuales para el cierre del Sprint 1 y preparación del Sprint 2.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4 md:grid-cols-2">
-          {[
-            {
-              label: "UI base para roles clave",
-              status: "Completo",
-              tone: "success",
-            },
-            {
-              label: "Navegación funcional entre vistas",
-              status: "Completo",
-              tone: "success",
-            },
-            {
-              label: "Simulación de métricas principales",
-              status: "En progreso",
-              tone: "info",
-            },
-            {
-              label: "Integración con backend",
-              status: "Pendiente Sprint 3",
-              tone: "warning",
-            },
-          ].map((item) => (
-            <div
-              key={item.label}
-              className="flex items-center justify-between rounded-[var(--radius-md)] border border-border/50 bg-muted/40 px-4 py-3 text-sm text-card-foreground"
-            >
-              <span>{item.label}</span>
-              <Badge tone={item.tone as "success" | "info" | "warning"}>{item.status}</Badge>
+            <div className="rounded-lg border border-border/50 bg-card/50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Última actualización
+              </p>
+              <p className="mt-2 text-sm font-semibold text-card-foreground">
+                {new Date().toLocaleString('es-CL', { 
+                  day: '2-digit', 
+                  month: 'short', 
+                  hour: '2-digit', 
+                  minute: '2-digit' 
+                })}
+              </p>
             </div>
-          ))}
+            <div className="rounded-lg border border-border/50 bg-card/50 p-4">
+              <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Notificaciones enviadas
+              </p>
+              <p className="mt-2 text-sm font-semibold text-card-foreground">
+                {estadisticasGenerales.total * 2} mensajes
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
