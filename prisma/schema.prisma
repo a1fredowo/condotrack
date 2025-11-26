@@ -8,6 +8,57 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
+// ==========================================
+// MODELO DE ROLES Y AUTENTICACIÓN
+// ==========================================
+
+model Usuario {
+  id             String       @id @default(uuid())
+  nombre         String
+  email          String       @unique
+  password       String?      // Hash de contraseña (nullable para migración)
+  rol            Rol          @default(residente)
+  activo         Boolean      @default(true)
+  
+  // Relaciones
+  departamento   Departamento? @relation(fields: [departamentoId], references: [id])
+  departamentoId Int?
+  encomiendas    Encomienda[]  @relation("ResidenteEncomiendas")
+  encomiendasRegistradas Encomienda[] @relation("ConserjeEncomiendas")
+  logsEntrega    LogEntrega[]
+  sesiones       Sesion[]
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  @@map("usuarios")
+  @@index([email])
+  @@index([rol])
+}
+
+enum Rol {
+  admin
+  conserje
+  residente
+}
+
+model Sesion {
+  id           String   @id @default(uuid())
+  usuario      Usuario  @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId    String
+  token        String   @unique
+  expiraEn     DateTime
+  createdAt    DateTime @default(now())
+  
+  @@map("sesiones")
+  @@index([token])
+  @@index([usuarioId])
+}
+
+// ==========================================
+// MODELO DE DEPARTAMENTOS
+// ==========================================
+
 model Departamento {
   id        Int      @id @default(autoincrement())
   numero    String
@@ -22,48 +73,91 @@ model Departamento {
   @@index([torre])
 }
 
-model Usuario {
-  id             String       @id @default(uuid())
-  nombre         String
-  email          String       @unique
-  departamento   Departamento? @relation(fields: [departamentoId], references: [id])
-  departamentoId Int?
-  encomiendas    Encomienda[]
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  
-  @@map("usuarios")
-}
+// ==========================================
+// MODELO DE ENCOMIENDAS Y QR
+// ==========================================
 
 model Encomienda {
-  id             String        @id @default(uuid())
-  codigo         String        @unique
-  residente      Usuario?      @relation(fields: [residenteId], references: [id])
-  residenteId    String?
-  residenteNombre String       // 👈 NUEVO: Nombre del residente
-  transportista  String
-  fechaRecepcion DateTime      @default(now())
-  estado         String        @default("pendiente")
-  prioridad      String        @default("normal")
-  notificaciones Notificacion[]
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id              String        @id @default(uuid())
+  codigo          String        @unique
+  residente       Usuario?      @relation("ResidenteEncomiendas", fields: [residenteId], references: [id])
+  residenteId     String?
+  residenteNombre String
+  transportista   String
+  fechaRecepcion  DateTime      @default(now())
+  fechaEntrega    DateTime?     // Nueva: fecha cuando se entrega
+  estado          String        @default("pendiente")
+  prioridad       String        @default("normal")
+  
+  // Relaciones
+  registradoPor   Usuario?      @relation("ConserjeEncomiendas", fields: [registradoPorId], references: [id])
+  registradoPorId String?
+  notificaciones  Notificacion[]
+  tokenQR         TokenQR?
+  logsEntrega     LogEntrega[]
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
   
   @@map("encomiendas")
   @@index([estado])
   @@index([residenteId])
   @@index([fechaRecepcion])
+  @@index([codigo])
 }
+
+model TokenQR {
+  id           String     @id @default(uuid())
+  encomienda   Encomienda @relation(fields: [encomiendaId], references: [id], onDelete: Cascade)
+  encomiendaId String     @unique
+  token        String     @unique  // Token único para validación
+  usado        Boolean    @default(false)
+  expiraEn     DateTime
+  createdAt    DateTime   @default(now())
+  
+  @@map("tokens_qr")
+  @@index([token])
+  @@index([encomiendaId])
+}
+
+// ==========================================
+// MODELO DE LOGS Y AUDITORÍA
+// ==========================================
+
+model LogEntrega {
+  id           String     @id @default(uuid())
+  encomienda   Encomienda @relation(fields: [encomiendaId], references: [id], onDelete: Cascade)
+  encomiendaId String
+  usuario      Usuario    @relation(fields: [usuarioId], references: [id])
+  usuarioId    String
+  accion       String     // "recepcion", "entrega", "incidencia", "qr_generado", "qr_validado"
+  detalles     String?    // JSON con detalles adicionales
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime   @default(now())
+  
+  @@map("logs_entrega")
+  @@index([encomiendaId])
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@index([accion])
+}
+
+// ==========================================
+// MODELO DE NOTIFICACIONES
+// ==========================================
 
 model Notificacion {
   id           String     @id @default(uuid())
   encomienda   Encomienda @relation(fields: [encomiendaId], references: [id], onDelete: Cascade)
   encomiendaId String
-  medio        String     // correo, app, sms
-  mensaje      String?    // Contenido opcional del mensaje
+  medio        String     // "correo", "push", "sms"
+  mensaje      String?
   entregada    Boolean    @default(false)
+  leida        Boolean    @default(false)
   enviadoEn    DateTime   @default(now())
   
   @@map("notificaciones")
   @@index([encomiendaId])
+  @@index([entregada])
 }

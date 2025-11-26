@@ -1,7 +1,7 @@
 import { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
-type BadgeTone = "default" | "success" | "warning" | "info";
+type BadgeTone = "default" | "success" | "warning" | "info" | "secondary" | "destructive";
 
 interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
   tone?: BadgeTone;
@@ -12,6 +12,8 @@ const toneStyles: Record<BadgeTone, string> = {
   success: "bg-success/10 text-success border border-success/30",
   warning: "bg-warning/10 text-warning border border-warning/30",
   info: "bg-primary/10 text-primary border border-primary/30",
+  secondary: "bg-secondary text-secondary-foreground border border-border/50",
+  destructive: "bg-destructive/10 text-destructive border border-destructive/30",
 };
 
 export function Badge({ className, tone = "default", ...props }: BadgeProps) {

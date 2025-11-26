@@ -50,6 +50,7 @@ export interface NuevaEncomienda {
   codigo: string;
   transportista: string;
   residenteNombre: string; // 👈 NUEVO: Obligatorio
+  residenteId?: string; // 👈 NUEVO: Opcional - si ya existe el usuario
   departamento?: string;
   prioridad?: PrioridadEncomienda;
 }
@@ -295,10 +296,10 @@ export async function addEncomienda(datos: NuevaEncomienda): Promise<EncomiendaC
   try {
     console.log('📝 Registrando nueva encomienda:', datos);
     
-    let residenteId: string | null = null;
+    let residenteId: string | null = datos.residenteId || null;
 
-    // Si se proporciona departamento, buscar o crear usuario
-    if (datos.departamento) {
+    // Si NO se proporcionó residenteId pero sí departamento, buscar o crear usuario
+    if (!residenteId && datos.departamento) {
       const usuarioCreado = await buscarOCrearUsuario(
         datos.residenteNombre,
         datos.departamento
@@ -310,6 +311,8 @@ export async function addEncomienda(datos: NuevaEncomienda): Promise<EncomiendaC
       } else {
         console.warn('⚠️ No se pudo vincular usuario, encomienda sin residenteId');
       }
+    } else if (residenteId) {
+      console.log('✅ Usuario ya existente vinculado:', residenteId);
     }
 
     // Crear encomienda CON residenteNombre

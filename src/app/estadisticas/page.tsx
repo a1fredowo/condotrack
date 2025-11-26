@@ -16,6 +16,7 @@ import {
   getTendenciaSemanal, 
   getDistribucionPorTorre 
 } from "@/lib/api/encomiendas";
+import { RoleGuard } from "@/components/auth/role-guard";
 
 type TendenciaItem = {
   day: string;
@@ -38,6 +39,14 @@ type TransportistaItem = {
 };
 
 export default function EstadisticasPage() {
+  return (
+    <RoleGuard allowedRoles={['admin', 'conserje']}>
+      <EstadisticasContent />
+    </RoleGuard>
+  );
+}
+
+function EstadisticasContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [estadisticasGenerales, setEstadisticasGenerales] = useState({
     total: 0,

@@ -18,6 +18,7 @@ import {
   type EstadoEncomienda 
 } from "@/lib/api/encomiendas";
 import { RegisterShipmentForm } from "@/components/forms/register-shipment-form";
+import { RoleGuard } from "@/components/auth/role-guard";
 
 const inputClass =
   "h-11 w-full rounded-[var(--radius-sm)] border border-border/70 bg-card/80 px-4 text-sm text-foreground placeholder:text-muted-foreground/80 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30";
@@ -49,6 +50,14 @@ function formatearFecha(isoDate: string): { fecha: string; hora: string } {
 }
 
 export default function EncomiendasPage() {
+  return (
+    <RoleGuard allowedRoles={['admin', 'conserje']}>
+      <EncomiendasContent />
+    </RoleGuard>
+  );
+}
+
+function EncomiendasContent() {
   const [shipments, setShipments] = useState<EncomiendaConDatos[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -157,6 +166,7 @@ export default function EncomiendasPage() {
 
   const handleAddShipment = async (data: {
     residente: string;
+    residenteId?: string;
     departamento: string;
     transportista: string;
     codigoSeguimiento: string;
@@ -167,6 +177,7 @@ export default function EncomiendasPage() {
         codigo: data.codigoSeguimiento || `ENV-${Date.now()}`,
         transportista: data.transportista,
         residenteNombre: data.residente,
+        residenteId: data.residenteId,
         departamento: data.departamento,
         prioridad: data.prioridad,
       });

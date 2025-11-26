@@ -1,7 +1,7 @@
 import { ButtonHTMLAttributes, forwardRef } from "react";
 import { cn } from "@/lib/utils";
 
-type ButtonVariant = "primary" | "outline" | "ghost";
+type ButtonVariant = "primary" | "default" | "outline" | "ghost";
 type ButtonSize = "sm" | "md" | "lg";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
@@ -11,6 +11,8 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
+    "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors",
+  default:
     "bg-primary text-primary-foreground shadow-sm hover:bg-primary/90 transition-colors",
   outline:
     "border border-border text-foreground shadow-sm hover:bg-muted/40 transition-colors",
@@ -24,12 +26,14 @@ const sizeStyles: Record<ButtonSize, string> = {
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = "primary", size = "md", ...props }, ref) => {
+  ({ className, variant = "primary", size = "md", disabled, ...props }, ref) => {
     return (
       <button
         ref={ref}
+        disabled={disabled}
         className={cn(
           "inline-flex items-center justify-center rounded-[var(--radius-sm)] font-medium tracking-tight",
+          "cursor-pointer disabled:cursor-not-allowed disabled:opacity-50",
           variantStyles[variant],
           sizeStyles[size],
           className,

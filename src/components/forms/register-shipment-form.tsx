@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,13 +11,25 @@ import {
 } from "@/components/ui/card";
 
 const inputClass =
-  "h-11 w-full rounded-[var(--radius-sm)] border border-border/70 bg-card/80 px-4 text-sm text-foreground placeholder:text-muted-foreground/80 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30";
+  "h-11 w-full rounded-[var(--radius-sm)] border border-border/70 bg-card/80 px-4 text-sm text-foreground placeholder:text-muted-foreground/80 outline-none transition focus:border-primary/60 focus:ring-2 focus:ring-primary/30 cursor-pointer";
 
 const labelClass = "text-sm font-medium text-card-foreground";
+
+interface Usuario {
+  id: string;
+  nombre: string;
+  email: string;
+  departamento?: {
+    id: number;
+    numero: string;
+    torre: string;
+  } | null;
+}
 
 interface RegisterShipmentFormProps {
   onSubmit: (data: {
     residente: string;
+    residenteId?: string;
     departamento: string;
     transportista: string;
     codigoSeguimiento: string;
@@ -27,6 +39,11 @@ interface RegisterShipmentFormProps {
 }
 
 export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFormProps) {
+  const [tipoRegistro, setTipoRegistro] = useState<"registrado" | "nuevo">("registrado");
+  const [usuarios, setUsuarios] = useState<Usuario[]>([]);
+  const [loadingUsuarios, setLoadingUsuarios] = useState(true);
+  const [selectedUsuarioId, setSelectedUsuarioId] = useState("");
+  
   const [formData, setFormData] = useState({
     residente: "",
     torre: "A",
@@ -39,15 +56,67 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cargar usuarios registrados (solo residentes)
+  useEffect(() => {
+    const cargarUsuarios = async () => {
+      try {
+        const res = await fetch('/api/usuarios?rol=residente');
+        if (res.ok) {
+          const data = await res.json();
+          setUsuarios(data.usuarios || []);
+        }
+      } catch (err) {
+        console.error('Error cargando usuarios:', err);
+      } finally {
+        setLoadingUsuarios(false);
+      }
+    };
+    cargarUsuarios();
+  }, []);
+
+  // Cuando selecciona un usuario registrado, autocompletar datos
+  const handleUsuarioSelect = (usuarioId: string) => {
+    setSelectedUsuarioId(usuarioId);
+    
+    if (usuarioId) {
+      const usuario = usuarios.find(u => u.id === usuarioId);
+      if (usuario) {
+        setFormData(prev => ({
+          ...prev,
+          residente: usuario.nombre,
+          torre: usuario.departamento?.torre || "A",
+          numeroDepartamento: usuario.departamento?.numero || "",
+        }));
+      }
+    } else {
+      // Limpiar si deselecciona
+      setFormData(prev => ({
+        ...prev,
+        residente: "",
+        torre: "A",
+        numeroDepartamento: "",
+      }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
     try {
-      // Validar departamento
-      if (!formData.numeroDepartamento.trim()) {
-        throw new Error('El número de departamento es requerido');
+      // Validar según tipo de registro
+      if (tipoRegistro === "registrado" && !selectedUsuarioId) {
+        throw new Error('Debe seleccionar un residente registrado');
+      }
+
+      if (tipoRegistro === "nuevo") {
+        if (!formData.residente.trim()) {
+          throw new Error('El nombre del residente es requerido');
+        }
+        if (!formData.numeroDepartamento.trim()) {
+          throw new Error('El número de departamento es requerido');
+        }
       }
 
       // Construir departamento en formato correcto
@@ -64,13 +133,14 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
 
       await onSubmit({
         residente: formData.residente,
+        residenteId: tipoRegistro === "registrado" ? selectedUsuarioId : undefined,
         departamento,
         transportista,
         codigoSeguimiento: formData.codigoSeguimiento,
         prioridad: formData.prioridad,
       });
       
-      // Reset form solo si se envía exitosamente
+      // Reset form
       setFormData({
         residente: "",
         torre: "A",
@@ -80,6 +150,7 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
         codigoSeguimiento: "",
         prioridad: "normal",
       });
+      setSelectedUsuarioId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al registrar encomienda');
       console.error('Error al enviar formulario:', err);
@@ -110,60 +181,155 @@ export function RegisterShipmentForm({ onSubmit, onCancel }: RegisterShipmentFor
               {error}
             </div>
           )}
-          <div className="grid gap-5 md:grid-cols-2">
-            <div className="space-y-2">
-              <label htmlFor="residente" className={labelClass}>
-                Nombre del Residente <span className="text-destructive">*</span>
-              </label>
-              <input
-                id="residente"
-                name="residente"
-                type="text"
-                required
-                value={formData.residente}
-                onChange={handleChange}
-                placeholder="Ej: María González"
-                className={inputClass}
-              />
-            </div>
 
-            <div className="space-y-2">
-              <label htmlFor="torre" className={labelClass}>
-                Torre <span className="text-destructive">*</span>
-              </label>
-              <select
-                id="torre"
-                name="torre"
-                required
-                value={formData.torre}
-                onChange={handleChange}
-                className={inputClass}
+          {/* Selector de tipo de registro */}
+          <div className="space-y-3">
+            <label className={labelClass}>Tipo de destinatario</label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setTipoRegistro("registrado");
+                  setSelectedUsuarioId("");
+                  setFormData(prev => ({ ...prev, residente: "", torre: "A", numeroDepartamento: "" }));
+                }}
+                className={`flex-1 rounded-[var(--radius-sm)] border-2 p-4 text-left transition-all cursor-pointer ${
+                  tipoRegistro === "registrado"
+                    ? "border-primary bg-primary/10"
+                    : "border-border/70 hover:border-border"
+                }`}
               >
-                <option value="A">Torre A</option>
-                <option value="B">Torre B</option>
-                <option value="C">Torre C</option>
-                <option value="D">Torre D</option>
-              </select>
+                <div className="font-medium">👤 Residente registrado</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Seleccionar de la lista de usuarios
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTipoRegistro("nuevo");
+                  setSelectedUsuarioId("");
+                  setFormData(prev => ({ ...prev, residente: "", torre: "A", numeroDepartamento: "" }));
+                }}
+                className={`flex-1 rounded-[var(--radius-sm)] border-2 p-4 text-left transition-all cursor-pointer ${
+                  tipoRegistro === "nuevo"
+                    ? "border-primary bg-primary/10"
+                    : "border-border/70 hover:border-border"
+                }`}
+              >
+                <div className="font-medium">📝 Nuevo destinatario</div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Ingresar datos manualmente
+                </div>
+              </button>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="numeroDepartamento" className={labelClass}>
-                Número de Departamento <span className="text-destructive">*</span>
-              </label>
-              <input
-                id="numeroDepartamento"
-                name="numeroDepartamento"
-                type="text"
-                required
-                value={formData.numeroDepartamento}
-                onChange={handleChange}
-                placeholder="Ej: 1205"
-                className={inputClass}
-              />
-              <p className="text-xs text-muted-foreground">
-                💡 Ingrese solo el número (Ej: <strong>1205</strong>, <strong>304</strong>, <strong>2A</strong>)
-              </p>
-            </div>
+          <div className="grid gap-5 md:grid-cols-2">
+            {/* Si es residente registrado, mostrar selector */}
+            {tipoRegistro === "registrado" ? (
+              <div className="space-y-2 md:col-span-2">
+                <label htmlFor="usuarioSelect" className={labelClass}>
+                  Seleccionar Residente <span className="text-destructive">*</span>
+                </label>
+                <select
+                  id="usuarioSelect"
+                  value={selectedUsuarioId}
+                  onChange={(e) => handleUsuarioSelect(e.target.value)}
+                  className={inputClass}
+                  disabled={loadingUsuarios}
+                >
+                  <option value="">
+                    {loadingUsuarios ? "Cargando residentes..." : "-- Seleccione un residente --"}
+                  </option>
+                  {usuarios.map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.nombre} {u.departamento ? `(Torre ${u.departamento.torre} - ${u.departamento.numero})` : "(Sin depto)"}
+                    </option>
+                  ))}
+                </select>
+                {usuarios.length === 0 && !loadingUsuarios && (
+                  <p className="text-xs text-warning">
+                    ⚠️ No hay residentes registrados. Use la opción &quot;Nuevo destinatario&quot;.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <>
+                {/* Formulario manual para nuevo destinatario */}
+                <div className="space-y-2">
+                  <label htmlFor="residente" className={labelClass}>
+                    Nombre del Destinatario <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    id="residente"
+                    name="residente"
+                    type="text"
+                    required
+                    value={formData.residente}
+                    onChange={handleChange}
+                    placeholder="Ej: María González"
+                    className={inputClass}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="torre" className={labelClass}>
+                    Torre <span className="text-destructive">*</span>
+                  </label>
+                  <select
+                    id="torre"
+                    name="torre"
+                    required
+                    value={formData.torre}
+                    onChange={handleChange}
+                    className={inputClass}
+                  >
+                    <option value="A">Torre A</option>
+                    <option value="B">Torre B</option>
+                    <option value="C">Torre C</option>
+                    <option value="D">Torre D</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label htmlFor="numeroDepartamento" className={labelClass}>
+                    Número de Departamento <span className="text-destructive">*</span>
+                  </label>
+                  <input
+                    id="numeroDepartamento"
+                    name="numeroDepartamento"
+                    type="text"
+                    required
+                    value={formData.numeroDepartamento}
+                    onChange={handleChange}
+                    placeholder="Ej: 1205"
+                    className={inputClass}
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Mostrar datos autocompletados si seleccionó un usuario */}
+            {tipoRegistro === "registrado" && selectedUsuarioId && (
+              <div className="md:col-span-2 rounded-[var(--radius-sm)] bg-muted/30 border border-border/50 p-4">
+                <div className="text-xs text-muted-foreground mb-2">Datos del residente seleccionado:</div>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Nombre:</span>
+                    <div className="font-medium">{formData.residente || "-"}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Torre:</span>
+                    <div className="font-medium">{formData.torre || "-"}</div>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Departamento:</span>
+                    <div className="font-medium">{formData.numeroDepartamento || "-"}</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <label htmlFor="transportista" className={labelClass}>

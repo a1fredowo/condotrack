@@ -66,23 +66,44 @@ export async function getNotificaciones(): Promise<NotificacionConDatos[]> {
 }
 
 /**
- * Envía un correo de prueba a una dirección específica
+ * Envía una notificación para una encomienda específica
  */
-export async function enviarNotificacionPrueba(email: string): Promise<void> {
+export async function enviarNotificacion(encomiendaId: string): Promise<{ success: boolean; message: string }> {
   const response = await fetch('/api/notificaciones/enviar', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email }),
+    body: JSON.stringify({ encomiendaId }),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.error || 'Error al enviar correo de prueba');
+    throw new Error(data.error || 'Error al enviar notificación');
   }
 
-  return response.json();
+  return data;
+}
+
+/**
+ * Obtiene el historial de notificaciones desde la API
+ */
+export async function getHistorialNotificaciones(): Promise<NotificacionConDatos[]> {
+  const response = await fetch('/api/notificaciones', {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Error al obtener historial');
+  }
+
+  return data.notificaciones || [];
 }
 
 /**
